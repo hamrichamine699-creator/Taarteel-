@@ -1,0 +1,50 @@
+name: Build Flutter APK
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.6'
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # التعديل السحري لحقن مساحة الاسم داخل حزمة الميكروفون قسرياً قبل بدء التجميع
+      - name: Fix speech_to_text package namespace
+        run: |
+          PUB_CACHE_DIR="$HOME/.pub-cache/hosted/pub.dev"
+          SPEECH_DIR=$(ls -d $PUB_CACHE_DIR/speech_to_text-* 2>/dev/null | head -n 1)
+          if [ -d "$SPEECH_DIR/android" ]; then
+            echo "android { namespace 'com.csdcorp.speech_to_text' }" >> "$SPEECH_DIR/android/build.gradle"
+          fi
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
